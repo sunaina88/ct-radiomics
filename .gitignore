@@ -1,0 +1,41 @@
+# virtual environment
+venv/
+env/
+ENV/
+
+# python cache
+__pycache__/
+*.pyc 
+*.pyo 
+
+# model files
+# *.pth
+# *.pkl
+
+# ide files
+.vscode/
+.idea/
+
+# os files
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+
+# frontend - node modules (CRITICAL)
+frontend/node_modules/
+frontend/**/node_modules/
+**/node_modules/
+
+# package files - DON'T COMMIT THESE
+**/package-lock.json
+**/package.json
+package-lock.json
+package.json
+
+# Next.js build output
+.next/
+out/
+EOF
+

@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-multipart
+torch
+torchvision
+numpy
+pandas
+opencv-python-headless
+scikit-image
+scikit-learn
+joblib
+reportlab
+supabase
+pydicom
+pillow
+grad-cam
+python-dotenv
