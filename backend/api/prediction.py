@@ -38,7 +38,7 @@ async def predict(
     
     try:
         image_bytes = await file.read()
-        original_img, normalized_img = preprocess(image_bytes)
+        original_img, normalized_img = preprocess(image_bytes, modality=modality)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
     
@@ -121,7 +121,7 @@ async def predict_all(
     
     try:
         image_bytes = await file.read()
-        original_img, normalized_img = preprocess(image_bytes)
+        original_img, normalized_img = preprocess(image_bytes, modality=modality)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
     
@@ -169,7 +169,7 @@ async def gradcam(
         raise HTTPException(status_code=400, detail="Modality must be 'ct' or 'mri'")
     try:
         image_bytes = await file.read()
-        original_img, normalized_img = preprocess(image_bytes)
+        original_img, normalized_img = preprocess(image_bytes, modality=modality)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
     
@@ -259,7 +259,7 @@ async def attention(
 
     try:
         image_bytes = await file.read()
-        original_img, normalized_img = preprocess(image_bytes)
+        original_img, normalized_img = preprocess(image_bytes, modality=modality)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
 
@@ -371,7 +371,7 @@ async def shap_single(
 
     try:
         image_bytes = await file.read()
-        original_img, _ = preprocess(image_bytes)
+        original_img, _ = preprocess(image_bytes, modality=modality)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
 
@@ -462,7 +462,7 @@ async def generate_report(
 
     try:
         image_bytes = await file.read()
-        original_img, _ = preprocess(image_bytes)
+        original_img, _ = preprocess(image_bytes, modality=modality)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
 
