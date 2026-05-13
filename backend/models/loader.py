@@ -154,22 +154,22 @@ class ModelLoader:
 
         print("\nLoading CT models...")
         
-        # CT CNN
+        # CT CNN - FIXED with weights_only=False for PyTorch 2.6+
         cnn_path = "models/best_ct_cnn_model.pth"
         if os.path.exists(cnn_path):
             self.ct_cnn = TumorCNN()
-            self.ct_cnn.load_state_dict(torch.load(cnn_path, map_location=self.device))
+            self.ct_cnn.load_state_dict(torch.load(cnn_path, map_location=self.device, weights_only=False))
             self.ct_cnn.to(self.device)
             self.ct_cnn.eval()
             print("CT CNN has been loaded!")
         else:
             print(f"CT CNN not found at {cnn_path}.")
         
-        # CT ViT
+        # CT ViT - FIXED with weights_only=False for PyTorch 2.6+
         vit_path = "models/vit_ct_model_complete.pth"
         if os.path.exists(vit_path):
             self.ct_vit = VisionTransformer()
-            state_dict = torch.load(vit_path, map_location=self.device)
+            state_dict = torch.load(vit_path, map_location=self.device, weights_only=False)
             if isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
                 self.ct_vit.load_state_dict(state_dict['model_state_dict'])
             else:
@@ -192,22 +192,22 @@ class ModelLoader:
 
         print("\nLoading MRI models...")
         
-        # MRI CNN
+        # MRI CNN - FIXED with weights_only=False for PyTorch 2.6+
         mri_cnn_path = "models/best_cnn_mri_model.pth"
         if os.path.exists(mri_cnn_path):
             self.mri_cnn = TumorCNN()
-            self.mri_cnn.load_state_dict(torch.load(mri_cnn_path, map_location=self.device))
+            self.mri_cnn.load_state_dict(torch.load(mri_cnn_path, map_location=self.device, weights_only=False))
             self.mri_cnn.to(self.device)
             self.mri_cnn.eval()
             print("MRI CNN has been loaded!")
         else:
             print(f"MRI CNN not found at {mri_cnn_path}.")
         
-        # MRI ViT
+        # MRI ViT - FIXED with weights_only=False for PyTorch 2.6+
         mri_vit_path = "models/vit_mri_model_complete.pth"
         if os.path.exists(mri_vit_path):
             self.mri_vit = VisionTransformer()
-            state_dict = torch.load(mri_vit_path, map_location=self.device)
+            state_dict = torch.load(mri_vit_path, map_location=self.device, weights_only=False)
             if isinstance(state_dict, dict) and 'model_state_dict' in state_dict:
                 self.mri_vit.load_state_dict(state_dict['model_state_dict'])
             else:
