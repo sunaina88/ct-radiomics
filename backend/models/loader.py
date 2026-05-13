@@ -166,7 +166,7 @@ class ModelLoader:
             print(f"CT CNN not found at {cnn_path}.")
         
         # CT ViT
-        vit_path = "models/best_ct_vit_model.pth"
+        vit_path = "models/vit_ct_model_complete.pth"
         if os.path.exists(vit_path):
             self.ct_vit = VisionTransformer()
             state_dict = torch.load(vit_path, map_location=self.device)
@@ -204,7 +204,7 @@ class ModelLoader:
             print(f"MRI CNN not found at {mri_cnn_path}.")
         
         # MRI ViT
-        mri_vit_path = "models/best_vit_mri_model.pth"
+        mri_vit_path = "models/vit_mri_model_complete.pth"
         if os.path.exists(mri_vit_path):
             self.mri_vit = VisionTransformer()
             state_dict = torch.load(mri_vit_path, map_location=self.device)
