@@ -199,7 +199,7 @@ export default function UploadPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
           <Link href="/" style={{ textDecoration: 'none' }}>
             <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
-              BrainScan<span style={{ color: 'var(--accent)' }}>AI</span>
+              Tumor<span style={{ color: 'var(--accent)' }}>Lens</span>
             </span>
           </Link>
           <div style={{ display: 'flex', gap: '0.25rem' }}>

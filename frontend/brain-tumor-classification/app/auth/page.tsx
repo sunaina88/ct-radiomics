@@ -69,7 +69,7 @@ export default function AuthPage() {
 
         <Link href="/" style={{ textDecoration: 'none', position: 'relative', zIndex: 1 }}>
           <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#fff' }}>
-  BrainScan<span style={{ color: 'rgba(255,255,255,0.6)' }}>AI</span>
+  Tumor<span style={{ color: 'rgba(255,255,255,0.6)' }}>Lens</span>
 </span>
 
         </Link>

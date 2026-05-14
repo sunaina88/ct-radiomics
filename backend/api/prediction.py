@@ -391,23 +391,35 @@ async def shap_single(
 
     try:
         import shap
-
+        import warnings
+        warnings.filterwarnings('ignore')
+        
         features = extract_features(original_img)
         features_df = pd.DataFrame([features])[feature_cols].fillna(0)
-
-        explainer = shap.TreeExplainer(model)
+        
+        # Create background with zeros (fast)
+        background = pd.DataFrame(
+            np.zeros((1, len(feature_cols))),
+            columns=feature_cols
+        )
+        
+        # Single explainer creation with background
+        explainer = shap.TreeExplainer(model, background, feature_perturbation="interventional")
         shap_values = explainer.shap_values(features_df)
 
-        # handle both list and array formats
+        # Handle different SHAP output formats
         if isinstance(shap_values, list):
-            tumor_shap = shap_values[1][0]  # single scan, tumor class
+            tumor_shap = shap_values[1][0]
+        elif hasattr(shap_values, 'values'):
+            # newer SHAP returns Explanation object
+            tumor_shap = shap_values.values[0, :, 1]
         else:
             tumor_shap = shap_values[0, :, 1]
-
-        # get feature values for this scan
+        
+        # Get feature values for this scan
         feature_values = features_df.iloc[0].to_dict()
 
-        # build top 6 by absolute SHAP value
+        # Build top 6 by absolute SHAP value
         shap_pairs = sorted(
             zip(feature_cols, tumor_shap),
             key=lambda x: abs(x[1]),
@@ -431,7 +443,6 @@ async def shap_single(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"SHAP analysis failed: {str(e)}")
-
 
 @router.post("/generate-report")
 async def generate_report(

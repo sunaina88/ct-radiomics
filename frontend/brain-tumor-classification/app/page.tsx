@@ -32,7 +32,7 @@ export default function LandingPage() {
           fontFamily: 'Syne, sans-serif', fontWeight: 700,
           fontSize: '1rem', color: 'var(--text-primary)', letterSpacing: '-0.01em'
         }}>
-          BrainScan<span style={{ color: 'var(--accent)' }}>AI</span>
+          Tumor<span style={{ color: 'var(--accent)' }}>Lens</span>
         </span>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <Link href="/models" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none' }}>Benchmarks</Link>
@@ -219,7 +219,7 @@ export default function LandingPage() {
       }}>
         <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
           <span style={{ fontFamily: 'DM Mono, monospace', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-            BrainScanAI · KIIT University
+            TumorLens · KIIT University
           </span>
           <Link href="https://github.com/sunaina88" target="_blank" style={{
             fontFamily: 'DM Mono, monospace', fontSize: '0.72rem',
