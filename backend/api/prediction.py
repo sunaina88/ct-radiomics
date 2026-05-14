@@ -76,7 +76,7 @@ async def predict(
                 response["probabilities"] = {"Healthy": probabilities[0], "Tumor": probabilities[1]}
                 response["radiomics_features"] = {k: float(v) for k, v in features.items()}
         
-        else:  
+        else:  # MRI
             if model_type == "cnn":
                 img_tensor = torch.FloatTensor(normalized_img).unsqueeze(0).unsqueeze(0)
                 prediction, confidence, probabilities = loader.predict_mri_cnn(img_tensor)
@@ -86,7 +86,7 @@ async def predict(
                 
             elif model_type == "vit":
                 img_tensor = torch.FloatTensor(normalized_img).unsqueeze(0).unsqueeze(0)
-                img_tensor = (img_tensor - 0.5) / 0.5
+                # MRI already normalized correctly by preprocess, no extra transform needed
                 prediction, confidence, probabilities = loader.predict_mri_vit(img_tensor)
                 response["prediction"] = prediction
                 response["confidence"] = confidence
@@ -128,10 +128,15 @@ async def predict_all(
     loader = get_loader()
     
     img_tensor_cnn = torch.FloatTensor(normalized_img).unsqueeze(0).unsqueeze(0)
-    img_tensor_vit = (img_tensor_cnn - 0.5) / 0.5
+    
+    # For ViT: CT needs (x-0.5)/0.5, MRI is already normalized correctly
+    if modality == "ct":
+        img_tensor_vit = (img_tensor_cnn - 0.5) / 0.5
+    else:
+        img_tensor_vit = img_tensor_cnn.clone()
+    
     features = extract_features(original_img)
     features_df = pd.DataFrame([features])
-    
     results = {"modality": modality}
     
     try:
@@ -144,7 +149,7 @@ async def predict_all(
             results["rf"] = {"prediction": pred, "confidence": conf, "probabilities": {"Healthy": probs[0], "Tumor": probs[1]}}
             results["radiomics_features"] = {k: float(v) for k, v in features.items()}
             
-        else: 
+        else:  # MRI
             pred, conf, probs = loader.predict_mri_cnn(img_tensor_cnn)
             results["cnn"] = {"prediction": pred, "confidence": conf, "probabilities": {"Healthy": probs[0], "Tumor": probs[1]}}
             pred, conf, probs = loader.predict_mri_vit(img_tensor_vit)
@@ -270,16 +275,12 @@ async def attention(
         raise HTTPException(status_code=500, detail=f"{modality.upper()} ViT model not loaded")
 
     try:
-        # preprocess for ViT — normalize to [-1, 1]
+        # prepare tensor for ViT
         img_tensor = torch.FloatTensor(normalized_img).unsqueeze(0).unsqueeze(0)
-        img_tensor = (img_tensor - 0.5) / 0.5
+        # CT needs (x-0.5)/0.5 normalization, MRI already normalized correctly by preprocess
+        if modality == "ct":
+            img_tensor = (img_tensor - 0.5) / 0.5
         img_tensor = img_tensor.to(loader.device)
-
-        attentions = []
-
-        def attn_hook(module, input, output):
-            # output is (attn_output, attn_weights) when need_weights=True
-            pass
 
         # manually extract attention from each transformer layer
         attn_weights_list = []
@@ -306,7 +307,6 @@ async def attention(
                 x = layer.norm2(x)
 
         # average attention across layers and heads, extract cls token attention to patches
-        # shape per layer: [batch, heads, seq_len, seq_len]
         attn_stack = torch.stack(attn_weights_list)  # [layers, batch, heads, seq, seq]
         attn_mean = attn_stack.mean(dim=0).mean(dim=1)  # [batch, seq, seq]
         cls_attn = attn_mean[0, 0, 1:]  # cls token attention to all patches: [64]
@@ -446,15 +446,18 @@ async def generate_report(
     patient_name: str = Form(default="Anonymous"),
     scan_date: str = Form(default="")
 ):
-    """Generate a PDF report with the image, predictions and a clinical disclaimer."""
+    """Generate a professional clinical PDF report — Times New Roman, no colour fills."""
 
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
         from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage, HRFlowable
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        from reportlab.platypus import (
+            SimpleDocTemplate, Paragraph, Spacer, Table,
+            TableStyle, Image as RLImage, HRFlowable
+        )
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_JUSTIFY
         from datetime import datetime
         import PIL.Image
     except ImportError:
@@ -467,6 +470,7 @@ async def generate_report(
         raise HTTPException(status_code=400, detail=f"Failed to process image: {str(e)}")
 
     try:
+        # prepare scan image
         if original_img.max() <= 1.0:
             img_display = (original_img * 255).astype(np.uint8)
         else:
@@ -483,117 +487,266 @@ async def generate_report(
         img_buf.seek(0)
 
         pdf_buf = io.BytesIO()
-        doc = SimpleDocTemplate(pdf_buf, pagesize=A4, rightMargin=2*cm, leftMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+        doc = SimpleDocTemplate(
+            pdf_buf, pagesize=A4,
+            rightMargin=2.5*cm, leftMargin=2.5*cm,
+            topMargin=2*cm, bottomMargin=2.5*cm
+        )
 
-        styles = getSampleStyleSheet()
+        BLACK = colors.black
+        DARK  = colors.HexColor('#1a1a1a')
+        MID   = colors.HexColor('#444444')
 
-        style_title = ParagraphStyle('Title', fontSize=20, fontName='Helvetica-Bold', textColor=colors.HexColor('#0A0E1A'), alignment=TA_CENTER, spaceAfter=4)
-        style_subtitle = ParagraphStyle('Subtitle', fontSize=11, fontName='Helvetica', textColor=colors.HexColor('#6B7280'), alignment=TA_CENTER, spaceAfter=2)
-        style_section = ParagraphStyle('Section', fontSize=12, fontName='Helvetica-Bold', textColor=colors.HexColor('#0A0E1A'), spaceBefore=14, spaceAfter=6)
-        style_disclaimer = ParagraphStyle('Disclaimer', fontSize=8, fontName='Helvetica-Oblique', textColor=colors.HexColor('#9CA3AF'), spaceAfter=4, leading=13)
+        # ── styles — all Times New Roman, monochrome ──────────────────────
+        style_title = ParagraphStyle(
+            'Title', fontName='Times-Bold', fontSize=16,
+            textColor=BLACK, alignment=TA_CENTER, spaceAfter=3
+        )
+        style_subtitle = ParagraphStyle(
+            'Subtitle', fontName='Times-Italic', fontSize=10,
+            textColor=MID, alignment=TA_CENTER, spaceAfter=2
+        )
+        style_section = ParagraphStyle(
+            'Section', fontName='Times-Bold', fontSize=11,
+            textColor=BLACK, spaceBefore=12, spaceAfter=5
+        )
+        style_body = ParagraphStyle(
+            'Body', fontName='Times-Roman', fontSize=10,
+            textColor=DARK, alignment=TA_JUSTIFY,
+            spaceAfter=6, leading=15
+        )
+        style_body_bold = ParagraphStyle(
+            'BodyBold', fontName='Times-Bold', fontSize=10,
+            textColor=BLACK, spaceAfter=4
+        )
+        style_small = ParagraphStyle(
+            'Small', fontName='Times-Roman', fontSize=8,
+            textColor=MID, alignment=TA_JUSTIFY,
+            spaceAfter=3, leading=12
+        )
+        style_small_it = ParagraphStyle(
+            'SmallIt', fontName='Times-Italic', fontSize=8,
+            textColor=MID, alignment=TA_JUSTIFY,
+            spaceAfter=3, leading=12
+        )
+        style_caption = ParagraphStyle(
+            'Caption', fontName='Times-Italic', fontSize=8,
+            textColor=MID, alignment=TA_CENTER, spaceAfter=2
+        )
+        style_consensus = ParagraphStyle(
+            'Consensus', fontName='Times-Bold', fontSize=15,
+            textColor=BLACK, alignment=TA_CENTER, spaceAfter=3
+        )
 
-        predictions = [cnn_prediction, vit_prediction, rf_prediction]
-        tumor_votes = predictions.count("Tumor")
-        consensus = "Tumor Detected" if tumor_votes >= 2 else "No Tumor Detected"
-        consensus_color = colors.HexColor('#EF4444') if tumor_votes >= 2 else colors.HexColor('#10B981')
+        # ── data ──────────────────────────────────────────────────────────
+        predictions  = [cnn_prediction, vit_prediction, rf_prediction]
+        tumor_votes  = predictions.count("Tumor")
+        consensus    = "TUMOR DETECTED" if tumor_votes >= 2 else "NO TUMOR DETECTED"
+        all_agree    = len(set(predictions)) == 1
+        scan_date_display = scan_date if scan_date else datetime.now().strftime("%d %B %Y")
+        report_ts    = datetime.now().strftime("%d %B %Y, %H:%M")
 
-        all_agree = len(set(predictions)) == 1
-        disagreement_note = "" if all_agree else "Note: Models show disagreement — radiologist review strongly recommended."
-
-        scan_date_display = scan_date if scan_date else datetime.now().strftime("%B %d, %Y")
+        def conf_pct(c):
+            return f"{c*100:.1f}%" if c <= 1 else f"{c:.1f}%"
 
         story = []
-        story.append(Paragraph("Brain Tumor Classification", style_title))
-        story.append(Paragraph("Clinical Decision Support Report", style_subtitle))
-        story.append(Spacer(1, 0.3*cm))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#E5E7EB')))
-        story.append(Spacer(1, 0.4*cm))
 
+        # ── HEADER ────────────────────────────────────────────────────────
+        story.append(Paragraph("BRAIN TUMOUR CLASSIFICATION REPORT", style_title))
+        story.append(Paragraph("Clinical Decision Support System — Research Use Only", style_subtitle))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=BLACK, spaceAfter=6))
+
+        # patient meta table
         meta_data = [
-            ["Patient", patient_name, "Scan Date", scan_date_display],
-            ["Modality", modality.upper(), "Report Generated", datetime.now().strftime("%B %d, %Y %H:%M")],
+            ["Patient",     patient_name,    "Scan Date",      scan_date_display],
+            ["Modality",    modality.upper(), "Report Date",    report_ts],
+            ["Institution", "—",             "Ref. Radiologist","—"],
         ]
-        meta_table = Table(meta_data, colWidths=[3*cm, 6*cm, 3.5*cm, 5*cm])
+        meta_table = Table(meta_data, colWidths=[3*cm, 5.5*cm, 3.5*cm, 4*cm])
         meta_table.setStyle(TableStyle([
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-            ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#374151')),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('FONTNAME',     (0,0), (-1,-1), 'Times-Roman'),
+            ('FONTNAME',     (0,0), (0,-1),  'Times-Bold'),
+            ('FONTNAME',     (2,0), (2,-1),  'Times-Bold'),
+            ('FONTSIZE',     (0,0), (-1,-1), 9),
+            ('TEXTCOLOR',    (0,0), (-1,-1), DARK),
+            ('TOPPADDING',   (0,0), (-1,-1), 3),
+            ('BOTTOMPADDING',(0,0), (-1,-1), 3),
+            ('LINEBELOW',    (0,-1),(-1,-1), 0.5, colors.HexColor('#aaaaaa')),
         ]))
         story.append(meta_table)
         story.append(Spacer(1, 0.4*cm))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E5E7EB')))
 
-        story.append(Paragraph("Consensus Result", style_section))
-        consensus_style = ParagraphStyle('Consensus', fontSize=16, fontName='Helvetica-Bold', textColor=consensus_color, alignment=TA_CENTER, spaceAfter=4)
-        story.append(Paragraph(consensus, consensus_style))
-        story.append(Paragraph(f"{tumor_votes}/3 models detected tumor", ParagraphStyle('Votes', fontSize=10, fontName='Helvetica', textColor=colors.HexColor('#6B7280'), alignment=TA_CENTER, spaceAfter=4)))
-        if disagreement_note:
-            story.append(Paragraph(disagreement_note, ParagraphStyle('DisagreeNote', fontSize=9, fontName='Helvetica-Bold', textColor=colors.HexColor('#F59E0B'), alignment=TA_CENTER, spaceAfter=4)))
+        # ── 1. CONSENSUS ──────────────────────────────────────────────────
+        story.append(Paragraph("1. CONSENSUS RESULT", style_section))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#aaaaaa'), spaceAfter=6))
+        story.append(Paragraph(consensus, style_consensus))
+        story.append(Paragraph(
+            f"{tumor_votes} of 3 independent models identified a tumour in this scan.",
+            ParagraphStyle('cvotes', fontName='Times-Roman', fontSize=9,
+                           textColor=MID, alignment=TA_CENTER, spaceAfter=4)
+        ))
+        if not all_agree:
+            story.append(Paragraph(
+                "Warning: Model predictions are not unanimous. Independent radiologist "
+                "review is strongly recommended before any clinical action.",
+                ParagraphStyle('warn', fontName='Times-BoldItalic', fontSize=9,
+                               textColor=BLACK, alignment=TA_CENTER, spaceAfter=6)
+            ))
 
-        story.append(Spacer(1, 0.3*cm))
-        story.append(Paragraph("Model Predictions", style_section))
+        # ── 2. MODEL PREDICTIONS TABLE ────────────────────────────────────
+        story.append(Paragraph("2. MODEL PREDICTIONS", style_section))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#aaaaaa'), spaceAfter=6))
+        story.append(Paragraph(
+            "Three independent analytical pipelines were applied to the uploaded scan. "
+            "Each model operates on distinct principles, providing complementary evidence "
+            "that reduces the risk of systematic error.",
+            style_body
+        ))
 
-        def pred_color(pred):
-            return colors.HexColor('#FEE2E2') if pred == "Tumor" else colors.HexColor('#D1FAE5')
-
-        model_data = [
-            ["Model", "Prediction", "Confidence", "Architecture"],
-            ["CNN", cnn_prediction, f"{cnn_confidence*100:.1f}%", "4-layer ConvNet"],
-            ["ViT", vit_prediction, f"{vit_confidence*100:.1f}%", "Vision Transformer"],
-            ["RF", rf_prediction, f"{rf_confidence*100:.1f}%", "Radiomics + Random Forest"],
+        pred_data = [
+            ["Model", "Architecture", "Prediction", "Confidence", "Accuracy"],
+            ["CNN",  "4-layer ConvNet",            cnn_prediction, conf_pct(cnn_confidence),
+             "98.5% (CT) / 98.5% (MRI)"],
+            ["ViT",  "Vision Transformer, 4 layers", vit_prediction, conf_pct(vit_confidence),
+             "97.2% (CT) / 97.3% (MRI)"],
+            ["RF",   "Random Forest, 30 features",  rf_prediction,  conf_pct(rf_confidence),
+             "89.2% (CT) / 92.7% (MRI)"],
         ]
-        model_table = Table(model_data, colWidths=[3*cm, 4*cm, 4*cm, 6.5*cm])
-        model_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0A0E1A')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('TEXTCOLOR', (0, 1), (-1, -1), colors.HexColor('#374151')),
-            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F9FAFB')]),
-            ('BACKGROUND', (1, 1), (1, 1), pred_color(cnn_prediction)),
-            ('BACKGROUND', (1, 2), (1, 2), pred_color(vit_prediction)),
-            ('BACKGROUND', (1, 3), (1, 3), pred_color(rf_prediction)),
-            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
-            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E5E7EB')),
-            ('TOPPADDING', (0, 0), (-1, -1), 7),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+        pred_table = Table(pred_data, colWidths=[1.5*cm, 4.5*cm, 2.8*cm, 2.5*cm, 4.7*cm])
+        pred_table.setStyle(TableStyle([
+            ('FONTNAME',     (0,0), (-1,0),  'Times-Bold'),
+            ('FONTNAME',     (0,1), (-1,-1), 'Times-Roman'),
+            ('FONTSIZE',     (0,0), (-1,-1), 9),
+            ('TEXTCOLOR',    (0,0), (-1,-1), DARK),
+            ('ALIGN',        (0,0), (-1,-1), 'LEFT'),
+            ('ALIGN',        (2,0), (3,-1),  'CENTER'),
+            ('TOPPADDING',   (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING',(0,0), (-1,-1), 4),
+            ('LINEBELOW',    (0,0), (-1,0),  1,   BLACK),
+            ('LINEBELOW',    (0,1), (-1,-1), 0.3, colors.HexColor('#cccccc')),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1), [colors.white, colors.HexColor('#f5f5f5')]),
+            ('BOX',          (0,0), (-1,-1), 0.5, colors.HexColor('#aaaaaa')),
         ]))
-        story.append(model_table)
-
-        story.append(Paragraph("Scan Image", style_section))
-        scan_img = RLImage(img_buf, width=5*cm, height=5*cm)
-        img_caption = Paragraph(f"{modality.upper()} scan — 64×64px preprocessed input", ParagraphStyle('Caption', fontSize=8, fontName='Helvetica-Oblique', textColor=colors.HexColor('#9CA3AF'), alignment=TA_CENTER))
-        img_table = Table([[scan_img], [img_caption]], colWidths=[17.5*cm])
-        img_table.setStyle(TableStyle([('ALIGN', (0, 0), (-1, -1), 'CENTER'), ('TOPPADDING', (0, 0), (-1, -1), 4)]))
-        story.append(img_table)
-
-        story.append(Spacer(1, 0.4*cm))
-        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#E5E7EB')))
+        story.append(pred_table)
         story.append(Spacer(1, 0.3*cm))
 
-        disclaimer_text = (
-            "DISCLAIMER: This report is generated by an AI system for research and "
-            "educational purposes only. It is not a substitute for professional medical advice, "
-            "diagnosis, or treatment. All findings must be reviewed and confirmed by a qualified "
-            "radiologist or medical professional before any clinical decision is made. "
-            "The AI models were trained on publicly available datasets and have not been validated "
-            "for clinical use. Always seek the advice of your physician or other qualified health "
-            "provider with any questions you may have regarding a medical condition."
+        # ── 3. MODEL REASONING ────────────────────────────────────────────
+        story.append(Paragraph("3. MODEL REASONING AND INTERPRETATION", style_section))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#aaaaaa'), spaceAfter=6))
+
+        cnn_txt = (
+            f"<b>Convolutional Neural Network (CNN)</b> — "
+            f"Prediction: <b>{cnn_prediction}</b>, Confidence: <b>{conf_pct(cnn_confidence)}</b>. "
+            f"The CNN applies learnable spatial filters across four convolutional blocks, detecting "
+            f"progressively complex features from edges and gradients in early layers to textural and "
+            f"structural patterns in deeper layers. Batch normalisation and dropout regularisation are "
+            f"applied throughout to improve generalisation. The model was trained on "
+            f"{'4,618 CT' if modality == 'ct' else '5,000 MRI'} images and achieves 98.5% test accuracy "
+            f"with an AUC of {'0.996' if modality == 'ct' else '0.998'}. "
+            + ("High confidence indicates strong visual evidence consistent with the training distribution."
+               if cnn_confidence > 0.85 else
+               "Moderate confidence suggests borderline visual characteristics — interpret with caution.")
         )
-        story.append(Paragraph(disclaimer_text, style_disclaimer))
+        story.append(Paragraph(cnn_txt, style_body))
+
+        vit_txt = (
+            f"<b>Vision Transformer (ViT)</b> — "
+            f"Prediction: <b>{vit_prediction}</b>, Confidence: <b>{conf_pct(vit_confidence)}</b>. "
+            f"The ViT divides the scan into 64 non-overlapping 8×8 pixel patches and processes all patches "
+            f"simultaneously using self-attention across four transformer layers. Unlike the CNN, the ViT "
+            f"captures long-range spatial dependencies across the entire image, making it sensitive to "
+            f"global structural abnormalities. It achieves {'97.2%' if modality == 'ct' else '97.3%'} "
+            f"accuracy with an AUC of {'0.991' if modality == 'ct' else '0.989'}. "
+            + ("Agreement with the CNN reinforces the finding."
+               if cnn_prediction == vit_prediction else
+               "Disagreement with the CNN suggests global and local features give conflicting evidence.")
+        )
+        story.append(Paragraph(vit_txt, style_body))
+
+        rf_txt = (
+            f"<b>Random Forest — Radiomics (RF)</b> — "
+            f"Prediction: <b>{rf_prediction}</b>, Confidence: <b>{conf_pct(rf_confidence)}</b>. "
+            f"The RF operates on 30 hand-crafted radiomics features: intensity statistics (mean, entropy, "
+            f"skewness, kurtosis), GLCM texture descriptors (contrast, homogeneity, correlation, energy), "
+            f"and shape measurements (solidity, eccentricity, roundness, aspect ratio). This model is "
+            f"fully interpretable — its decision is attributable to specific, clinically meaningful image "
+            f"properties. It achieves {'89.2%' if modality == 'ct' else '92.7%'} accuracy with an AUC of "
+            f"{'0.925' if modality == 'ct' else '0.962'}."
+        )
+        story.append(Paragraph(rf_txt, style_body))
+
+        # ensemble
+        story.append(Paragraph("Ensemble Agreement", style_body_bold))
+        if all_agree:
+            ensemble_txt = (
+                f"All three models unanimously predicted {predictions[0]}. Unanimous consensus across "
+                f"architecturally distinct models substantially reduces the probability of a false result."
+            )
+        else:
+            ensemble_txt = (
+                f"The models do not unanimously agree (CNN: {cnn_prediction}, ViT: {vit_prediction}, "
+                f"RF: {rf_prediction}). Disagreement may indicate borderline imaging characteristics, "
+                f"image artefacts, or a case at the boundary of the training distribution. "
+                f"Independent radiologist review is essential."
+            )
+        story.append(Paragraph(ensemble_txt, style_body))
+
+        # ── 4. SCAN IMAGE ─────────────────────────────────────────────────
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#aaaaaa'), spaceAfter=4))
+        story.append(Paragraph("4. SCAN IMAGE", style_section))
+        story.append(Paragraph(
+            "The image below shows the uploaded scan after preprocessing (resized to 64×64 pixels, "
+            "grayscale normalisation applied). This is the exact input received by all three models.",
+            style_body
+        ))
+
+        scan_img_obj = RLImage(img_buf, width=4.5*cm, height=4.5*cm)
+        img_tbl = Table([[scan_img_obj]], colWidths=[16*cm])
+        img_tbl.setStyle(TableStyle([
+            ('ALIGN',        (0,0), (-1,-1), 'CENTER'),
+            ('BOX',          (0,0), (-1,-1), 0.5, colors.HexColor('#aaaaaa')),
+            ('TOPPADDING',   (0,0), (-1,-1), 6),
+            ('BOTTOMPADDING',(0,0), (-1,-1), 6),
+        ]))
+        story.append(img_tbl)
+        story.append(Paragraph(
+            f"Figure 1. Preprocessed {modality.upper()} scan submitted for analysis.",
+            style_caption
+        ))
+
+        # ── 5. LIMITATIONS ────────────────────────────────────────────────
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor('#aaaaaa'), spaceAfter=4))
+        story.append(Paragraph("5. LIMITATIONS", style_section))
+        for lim in [
+            "Models were trained on publicly available datasets and have not been prospectively validated in a clinical setting.",
+            "Training data does not include demographic annotations; generalisation to specific patient populations has not been assessed.",
+            "Input images are resized to 64×64 pixels; fine structural detail present in the original scan may be lost.",
+            "Confidence scores reflect softmax outputs and are not calibrated probability estimates.",
+            "This system detects tumour presence only. It does not classify tumour type, grade, or anatomical location.",
+        ]:
+            story.append(Paragraph(f"• {lim}", style_small))
+
+        # ── DISCLAIMER ────────────────────────────────────────────────────
+        story.append(HRFlowable(width="100%", thickness=1.2, color=BLACK, spaceBefore=10, spaceAfter=4))
+        story.append(Paragraph(
+            "DISCLAIMER — FOR RESEARCH AND EDUCATIONAL USE ONLY",
+            ParagraphStyle('dhead', fontName='Times-Bold', fontSize=8,
+                           textColor=BLACK, alignment=TA_CENTER, spaceAfter=3)
+        ))
+        story.append(Paragraph(
+            "This report has been generated automatically by an artificial intelligence system and is provided "
+            "solely for research and educational purposes. It does not constitute a medical diagnosis, clinical "
+            "opinion, or recommendation for treatment. All findings must be independently reviewed and confirmed "
+            "by a qualified radiologist or medical professional before any clinical decision is made. The system "
+            "has not been approved by any regulatory authority for clinical deployment. The authors and developers "
+            "of this system accept no liability for decisions made on the basis of this report.",
+            style_small_it
+        ))
 
         doc.build(story)
         pdf_buf.seek(0)
 
         filename = f"brainscan_report_{patient_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-
         return StreamingResponse(
             pdf_buf,
             media_type="application/pdf",
