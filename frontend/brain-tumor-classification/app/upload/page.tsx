@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
+import Navbar from '../../components/Navbar'
 import { useDropzone } from 'react-dropzone'
 import { supabase } from '../../lib/supabase'
 import { predictAll, getGradcam, generateReport, getAttention, getShapSingle } from '../../lib/api'
@@ -187,41 +188,7 @@ export default function UploadPage() {
         </div>
       )}
 
-      {/* navbar */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1rem 2.5rem',
-        borderBottom: '1px solid var(--border)',
-        background: 'rgba(240, 244, 255, 0.9)',
-        backdropFilter: 'blur(12px)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
-              Tumor<span style={{ color: 'var(--accent)' }}>Lens</span>
-            </span>
-          </Link>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {[
-              { label: 'Dashboard', href: '/dashboard', active: false },
-              { label: 'Upload scan', href: '/upload', active: true },
-              { label: 'Benchmarks', href: '/models', active: false },
-            ].map(item => (
-              <Link key={item.href} href={item.href} style={{
-                textDecoration: 'none', fontSize: '0.85rem',
-                padding: '0.35rem 0.75rem', borderRadius: '6px',
-                color: item.active ? 'var(--accent)' : 'var(--text-muted)',
-                background: item.active ? 'var(--accent-dim)' : 'transparent',
-                fontWeight: item.active ? 500 : 400
-              }}>{item.label}</Link>
-            ))}
-          </div>
-        </div>
-        <Link href="/dashboard" style={{
-          fontSize: '0.8rem', color: 'var(--text-muted)', textDecoration: 'none'
-        }}>← Back to dashboard</Link>
-      </nav>
+      <Navbar />
 
       <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2.5rem' }}>
         <div style={{ marginBottom: '2rem' }}>

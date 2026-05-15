@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Navbar from '../../components/Navbar'
 
 const papers = [
   {
@@ -71,30 +72,7 @@ export default function ResourcesPage() {
   return (
     <main style={{ background: 'var(--bg)', minHeight: '100vh' }}>
 
-      {/* navbar */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1rem 2.5rem',
-        borderBottom: '1px solid var(--border)',
-        background: 'rgba(240,244,255,0.9)',
-        backdropFilter: 'blur(12px)'
-      }}>
-        <Link href="/" style={{ textDecoration: 'none' }}>
-          <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
-            BrainScan<span style={{ color: 'var(--accent)' }}>AI</span>
-          </span>
-        </Link>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <Link href="/dashboard" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textDecoration: 'none' }}>Dashboard</Link>
-          <Link href="/models" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textDecoration: 'none' }}>Benchmarks</Link>
-          <Link href="/upload" style={{
-            background: 'var(--accent)', color: '#fff',
-            fontSize: '0.85rem', fontWeight: 600,
-            textDecoration: 'none', padding: '0.35rem 0.9rem', borderRadius: '6px'
-          }}>Upload scan</Link>
-        </div>
-      </nav>
+      <Navbar showAuth={false} />
 
       <div style={{ maxWidth: '860px', margin: '0 auto', padding: '2.5rem' }}>
 

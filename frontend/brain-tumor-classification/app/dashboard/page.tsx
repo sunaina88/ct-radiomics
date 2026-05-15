@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Navbar from '../../components/Navbar'
 import { supabase } from '../../lib/supabase'
 
 type Scan = {
@@ -77,49 +78,7 @@ export default function DashboardPage() {
   return (
     <main style={{ background: 'var(--bg)', minHeight: '100vh' }}>
 
-      {/* navbar */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1rem 2.5rem',
-        borderBottom: '1px solid var(--border)',
-        background: 'rgba(240, 244, 255, 0.9)',
-        backdropFilter: 'blur(12px)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
-          <Link href="/" style={{ textDecoration: 'none' }}>
-            <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '1rem', color: 'var(--text-primary)' }}>
-              Tumor<span style={{ color: 'var(--accent)' }}>Lens</span>
-            </span>
-          </Link>
-          <div style={{ display: 'flex', gap: '0.25rem' }}>
-            {[
-              { label: 'Dashboard', href: '/dashboard', active: true },
-              { label: 'Upload scan', href: '/upload', active: false },
-              { label: 'Benchmarks', href: '/models', active: false },
-            ].map(item => (
-              <Link key={item.href} href={item.href} style={{
-                textDecoration: 'none', fontSize: '0.85rem',
-                padding: '0.35rem 0.75rem', borderRadius: '6px',
-                color: item.active ? 'var(--accent)' : 'var(--text-muted)',
-                background: item.active ? 'var(--accent-dim)' : 'transparent',
-                fontWeight: item.active ? 500 : 400
-              }}>{item.label}</Link>
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace' }}>
-            {user?.email}
-          </span>
-          <button onClick={handleSignOut} style={{
-            background: 'none', border: '1px solid var(--border)',
-            borderRadius: '6px', padding: '0.35rem 0.9rem',
-            fontSize: '0.8rem', color: 'var(--text-muted)',
-            cursor: 'pointer', fontFamily: 'DM Sans, sans-serif'
-          }}>Sign out</button>
-        </div>
-      </nav>
+      <Navbar />
 
       <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '2.5rem' }}>
 
@@ -151,7 +110,7 @@ export default function DashboardPage() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
             }}>
               <div style={{
-                fontSize: '1.5rem', fontWeight: 600,
+                fontWeight: 600,
                 color: i === 1 ? 'var(--danger)' : i === 2 ? 'var(--success)' : 'var(--text-primary)',
                 fontFamily: s.mono ? 'DM Mono, monospace' : 'Syne, sans-serif',
                 fontSize: s.mono ? '0.95rem' : '1.5rem',

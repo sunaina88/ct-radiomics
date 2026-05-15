@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Navbar from '../components/Navbar'
 
 export default function LandingPage() {
   return (
@@ -16,39 +17,9 @@ export default function LandingPage() {
         opacity: 0.6
       }} />
 
-      {/* navbar */}
-      <nav style={{
-        position: 'sticky', top: 0, zIndex: 10,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '1rem 2.5rem',
-        borderBottom: '1px solid var(--border)',
-        background: 'rgba(248, 249, 252, 0.9)',
-        backdropFilter: 'blur(12px)'
-      }}>
-        <span style={{
-          fontFamily: 'Syne, sans-serif', fontWeight: 700,
-          fontSize: '1rem', color: 'var(--text-primary)', letterSpacing: '-0.01em'
-        }}>
-          Tumor<span style={{ color: 'var(--accent)' }}>Lens</span>
-        </span>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <Link href="/models" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none' }}>Benchmarks</Link>
-          <Link href="/resources" style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textDecoration: 'none' }}>Research</Link>
-          <Link href="/auth" style={{
-            color: 'var(--text-primary)', fontSize: '0.85rem', textDecoration: 'none',
-            padding: '0.35rem 0.9rem',
-            border: '1px solid var(--border-2)', borderRadius: '6px',
-            background: 'var(--surface)'
-          }}>Sign in</Link>
-          <Link href="/auth" style={{
-            background: 'var(--accent)', color: '#fff',
-            fontSize: '0.85rem', fontWeight: 600,
-            textDecoration: 'none', padding: '0.35rem 0.9rem', borderRadius: '6px'
-          }}>Get started</Link>
-        </div>
-      </nav>
+      <Navbar showAuth={false} />
 
-      {/* hero */}
+      {/* subtle grid */}
       <section style={{
         position: 'relative', zIndex: 1,
         maxWidth: '860px', margin: '0 auto',
