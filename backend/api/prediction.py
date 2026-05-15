@@ -442,7 +442,14 @@ async def shap_single(
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"SHAP analysis failed: {str(e)}")
+        print(f"SHAP error (non-fatal): {e}")
+        # Return empty instead of crashing
+        return {
+            "modality": modality,
+            "top_features": [],
+            "error": "SHAP temporarily unavailable"
+        }
+
 
 @router.post("/generate-report")
 async def generate_report(
