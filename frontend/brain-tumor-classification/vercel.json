@@ -1,6 +1,6 @@
 {
-  "buildCommand": "cd frontend/brain-tumor-classification && npm install && npm run build",
-  "outputDirectory": "frontend/brain-tumor-classification/.next",
   "framework": "nextjs",
-  "installCommand": "cd frontend/brain-tumor-classification && npm install"
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next"
 }
