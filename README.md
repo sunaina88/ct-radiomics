@@ -9,7 +9,7 @@ TumorLens is a full-stack medical AI system that detects brain tumors from CT an
 # Live Demo
 
 - **Frontend:** https://tumorlens.vercel.app
-- **Backend API:** https://tumorlens-api.onrender.com/docs
+- **Backend API:** https://radiomics-project.onrender.com/docs
 
 ---
 
@@ -42,7 +42,7 @@ TumorLens is a full-stack medical AI system that detects brain tumors from CT an
 |-------|----------|-----|-------------|-------------|
 | CNN | 98.5% | 0.998 | 99.2% | 97.5% |
 | ViT | 97.3% | 0.989 | 98.3% | 95.8% |
-| Random Forest | 92.7% | 0.962 | - | - |
+| Random Forest | 92.7% | 0.962 | 91% | 93% |
 
 ---
 
@@ -328,10 +328,7 @@ Sunaina
 
 # Acknowledgments
 
-- Kaggle for providing the brain tumor datasets
-- PyTorch team for deep learning framework
-- SHAP authors for model interpretability library
-- Hugging Face for hosting resources
+- Md. Golam Murtoza: https://www.kaggle.com/datasets/murtozalikhon/brain-tumor-multimodal-image-ct-and-mri
 
 ---
 
