@@ -28,14 +28,10 @@ frontend/node_modules/
 frontend/**/node_modules/
 **/node_modules/
 
-# package files - DON'T COMMIT THESE
+# package-lock files (but NOT package.json)
 **/package-lock.json
-**/package.json
 package-lock.json
-package.json
 
 # Next.js build output
 .next/
 out/
-EOF
-
