@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Navbar from '../../components/Navbar'
 import { useDropzone } from 'react-dropzone'
 import { supabase } from '../../lib/supabase'
-import { predictAll, getGradcam, generateReport, getAttention, getShapSingle } from '../../lib/api'
+import { predictAll, getGradcam, generateReport, getAttention } from '../../lib/api'
 import ExpandableBreakdown from '../../components/ExpandableBreakdown'
 
 type Results = {
@@ -85,14 +85,10 @@ export default function UploadPage() {
       setResults(predResults)
       setGradcam(gradcamResults)
 
-      // run attention + shap in background after main results show
+      // run attention in background after main results show
       setExpandLoading(true)
-      Promise.all([
-        getAttention(file, modality).catch(() => null),
-        getShapSingle(file, modality).catch(() => null)
-      ]).then(([attentionResults, shapResults]) => {
+      getAttention(file, modality).catch(() => null).then((attentionResults) => {
         setAttention(attentionResults)
-        setShapData(shapResults)
         setExpandLoading(false)
       })
 
@@ -456,8 +452,9 @@ export default function UploadPage() {
             attentionImage={attention?.attention_overlay || null}
             rfPrediction={results.rf.prediction}
             rfConfidence={results.rf.confidence}
-            shapFeatures={shapData?.top_features || null}
+            shapFeatures={null}
             loading={expandLoading}
+            modality={modality}
           />
         )}
       </div>

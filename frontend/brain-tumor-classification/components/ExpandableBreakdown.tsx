@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis,
-  PolarRadiusAxis, ResponsiveContainer, Tooltip
+  PolarRadiusAxis, ResponsiveContainer, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell
 } from 'recharts'
 
 interface ShapFeature {
@@ -21,6 +22,7 @@ interface Props {
   rfConfidence: number
   shapFeatures: ShapFeature[] | null
   loading?: boolean
+  modality: 'ct' | 'mri'
 }
 
 const featureLabels: Record<string, string> = {
@@ -55,9 +57,29 @@ export default function ExpandableBreakdown({
   rfPrediction,
   rfConfidence,
   shapFeatures,
-  loading = false
+  loading = false,
+  modality
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [shapData, setShapData] = useState<any[]>([])
+
+  useEffect(() => {
+    const file = modality === 'ct' ? 'ct' : 'mri'
+    fetch(`/shap/shap_top_features_rf_${file}.csv`)
+      .then(r => r.text())
+      .then(text => {
+        const rows = text.trim().split('\n').slice(1)
+        const data = rows.slice(0, 10).map(row => {
+          const [feature, value] = row.split(',')
+          return {
+            feature: feature.replace(/_/g, ' '),
+            value: parseFloat(value)
+          }
+        }).sort((a, b) => b.value - a.value)
+        setShapData(data)
+      })
+      .catch(err => console.error('Failed to load SHAP data:', err))
+  }, [modality])
 
   const maxShap = shapFeatures
     ? Math.max(...shapFeatures.map(f => Math.abs(f.shap_value)), 0.001)
@@ -319,66 +341,45 @@ export default function ExpandableBreakdown({
                 fontWeight: 500,
                 color: 'var(--text-muted)',
                 marginBottom: '0.75rem'
-              }}>SHAP feature importance — this scan</div>
-
-              {shapFeatures ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                  {shapFeatures.map((f) => (
-                    <div key={f.feature}>
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        marginBottom: '0.25rem'
-                      }}>
-                        <span style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 500,
-                          color: 'var(--text-primary)'
-                        }}>{formatFeatureName(f.feature)}</span>
-                        <span style={{
-                          fontFamily: 'DM Mono, monospace',
-                          fontSize: '0.7rem',
-                          color: f.direction === 'tumor' ? 'var(--danger)' : 'var(--success)'
-                        }}>
-                          {f.shap_value > 0 ? '+' : ''}{f.shap_value.toFixed(3)}
-                        </span>
-                      </div>
-                      <div style={{
-                        background: 'var(--surface-2)',
-                        borderRadius: '4px',
-                        height: '6px',
-                        overflow: 'hidden'
-                      }}>
-                        <div style={{
-                          height: '100%',
-                          borderRadius: '4px',
-                          background: f.direction === 'tumor' ? 'var(--danger)' : 'var(--success)',
-                          width: `${(Math.abs(f.shap_value) / maxShap) * 100}%`,
-                          transition: 'width 0.6s ease'
-                        }} />
-                      </div>
-                      <div style={{
-                        fontFamily: 'DM Mono, monospace',
-                        fontSize: '0.62rem',
-                        color: 'var(--text-muted)',
-                        marginTop: '0.15rem'
-                      }}>
-                        value: {f.feature_value.toFixed(4)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              }}>SHAP feature importance — precomputed on full training set</div>
+              {shapData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={shapData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 9, fontFamily: 'DM Mono, monospace', fill: 'var(--text-muted)' }}
+                      tickFormatter={v => v.toFixed(3)}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="feature"
+                      width={100}
+                      tick={{ fontSize: 9, fontFamily: 'DM Mono, monospace', fill: 'var(--text-primary)' }}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderRadius: '6px', fontSize: '0.75rem', fontFamily: 'DM Mono, monospace'
+                      }}
+                      formatter={(v: any) => [v.toFixed(4), 'Mean |SHAP|']}
+                    />
+                    <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                      {shapData.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={`hsl(${200 + i * 15}, ${70 - i * 3}%, ${45 + i * 2}%)`}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               ) : (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '1.5rem',
-                  color: 'var(--text-muted)',
-                  fontSize: '0.8rem'
-                }}>
-                  {loading ? 'Computing SHAP values...' : 'SHAP values unavailable'}
-                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Loading...</p>
               )}
+              <p style={{ fontSize: '0.62rem', color: 'var(--text-muted)', fontFamily: 'DM Mono, monospace', marginTop: '0.4rem' }}>
+                Mean absolute SHAP value · higher = more influential
+              </p>
             </div>
 
             {/* radar chart */}
