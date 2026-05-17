@@ -108,7 +108,7 @@ export default function ResourcesPage() {
                   Kaggle · 2024 · 9,599 images total
                 </div>
               </div>
-              <a href="https://www.kaggle.com" target="_blank" style={{
+              <a href="https://www.kaggle.com/datasets/murtozalikhon/brain-tumor-multimodal-image-ct-and-mri/data" target="_blank" style={{
                 fontSize: '0.78rem', color: 'var(--accent)',
                 textDecoration: 'none', fontWeight: 500,
                 border: '1px solid var(--accent)', borderRadius: '5px',
